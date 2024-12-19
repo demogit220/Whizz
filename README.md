@@ -1,5 +1,9 @@
 ## Install guide
-> Make .env file
+Copy .env file
+
+`python -m venv venv` -> to create virtual environment
+
+`source venv/bin/activate` -> activate virtual environment
 
 `pip install -r requirements.txt`
 
