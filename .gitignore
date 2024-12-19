@@ -1,0 +1,5 @@
+venv
+embeddings
+data
+.env
+index_store
