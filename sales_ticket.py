@@ -4,15 +4,10 @@ import requests
 from dotenv import load_dotenv
 
 load_dotenv()
-# Retrieve credentials from environment variables (recommended)
-username = os.getenv("SALESFORCE_USERNAME")
-password = os.getenv("SALESFORCE_PASSWORD")
 auth_url = os.getenv("AUTH_URL")
 session_url = os.getenv("SANDBOX_URL")
-
+    
 def auth_token():
-# Define the authentication API endpoint and payload
-    # Optional: Specify headers if required (e.g., Content-Type)
     headers = {
     "Content-Type": "application/x-www-form-urlencoded",
     "Accept": "application/json"
@@ -31,36 +26,22 @@ def auth_token():
         print(f"Response: {response.text}")
 
 
-def create_ticket(acces_token, data):
-    
+def create_ticket_utility(acces_token, data):
     try:
         sf = Salesforce(instance_url=session_url, session_id=acces_token)
-
-        # Data for the new Case (Ticket)
-        case_data = {
-            'Subject': data["subject"],
-            'Description': data["description"],
-            'Status': 'New', # Or 'Working', 'Closed', etc.
-            'Priority': 'High', # Or 'Medium', 'Low'
-            'Origin': 'Web',     # Or 'Phone', 'Email'
-            # Add other required or custom fields as needed
-        }
-
-        # Create the Case
+        print(data)
         try:
-            result = sf.Case.create(case_data)
+            result = sf.Case.create(data)
+            pass
         except Exception as e:
             print(e)
 
-        # Print the result (contains the new Case ID)
         print(f"Case created successfully: {result}")
         case_id = result['id']
         print(f"Case ID: {case_id}")
-
+        return case_id
     except Exception as e:
         print(f"An error occurred: {e}")
-
-    # Example of how to query for the newly created case (optional):
         try:
             retrieved_case = sf.Case.get(case_id)
             print(f"Retrieved case details: {retrieved_case}")

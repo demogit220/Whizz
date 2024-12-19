@@ -1,122 +1,138 @@
 import streamlit as st
+import requests
 
-conversation_flow = {
-    "start": {
-        "message": "Hi there! How can I help you today?",
-        "options": {
-            "Issue related to BN": "BN",
-            "Issue related to RN": "RN",
-            "Do you want to replace the radio device?": "RMA",
-        "Do you want to talk with our customer team executive" : "customer_on_call",
-        "Query related to particular release" : "release_query",
-        "Congiuration issue?" : "configuration_issue",
-        "Your issue is not listed" : "other"
-        },
-    },
-    "BN": {
-        "message": "What kind of technical issue are you experiencing on BN?",
-        "options": {
-            "Is it related to latency?": "BN_LATENCY",
-            "Issue to login into device?": "BN_LOGIN",
-            "My issue is not mentioned here!!": "other"
-        },
-    },
-    "RN": {
-        "message": "What kind of technical issue are you experiencing on RN?",
-        "options": {
-            "Is it related to latency?": "RN_LATENCY",
-            "Issue to login into device?": "RN_LOGIN",
-            "My issue is not mentioned here!!": "other"
-        },
-    },
-    "RMA": {
-        "message": "Please provide below details",
-        "input": True,
-    },
-    "customer_on_call": {
-        "message": "This feature is not live please create ticket we will connect you asap!!",
-        "input": True
-    },
-    "release_query": {
-        "message": "Can you please provide the release number?",
-        "input": True
-    },
-    "configuration_issue": {
-        "message": "Please describe your issue!",
-        "input": True
-    },
-    "other": {  
-        "message": "Please enter your further query:",
-        "input": True
-    },
-    "leaf_node" : {
-    "message": "Please describe your issue!",
-    "input" : True
-    }
-}
+# Backend API URL
+API_URL = "http://127.0.0.1:5000/v1/query"
+API_URL_CREATE_TICKET = "http://127.0.0.1:5000/v1/create_ticket"
 
-def main():
-    st.title("XYZ Whizz Bot")
-    st.write("Hi there, thank you for reaching out. I am XYZ Whizz Bot and I am here to help you.")
+def create_ticket(payload):
+    try:
+        response = requests.post(API_URL_CREATE_TICKET, json=payload)
+        if response.status_code == 200:
+            data = response.json()
+            st.success(f"Ticket created successfully! Ticket ID: {data['ticket_id']}")
+            # Add the response to chat history
+            st.session_state.chat_history.append(("Ticket creation", f"Ticket created successfully! Ticket ID: {data['ticket_id']}"))
+        else:
+            error = response.json().get("error", "An error occurred.")
+            st.error(f"Failed to create ticket: {error}")
+            # Add the error response to chat history
+            st.session_state.chat_history.append(("Ticket creation", f"Failed to create ticket: {error}"))
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        # Add error to chat history
+        st.session_state.chat_history.append(("Ticket creation", f"An error occurred: {str(e)}"))
 
-    if "current_state" not in st.session_state:
-        st.session_state.current_state = "start"
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-    if "user_input" not in st.session_state:
-        st.session_state.user_input = ""
+# Initialize session state for chat history
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []  # List of (user_message, bot_response) tuples
+if "stage" not in st.session_state:
+    st.session_state.stage = "greeting"
 
-    current_state = conversation_flow[st.session_state.current_state]
+# Function to display chat history
+def display_chat_history():
+    if st.session_state.chat_history:
+        for user_message, bot_response in st.session_state.chat_history:
+            st.markdown(f"**You:** {user_message}")
+            st.markdown(f"**Bot:** {bot_response}")
+            st.markdown("---")
+    else:
+        st.write("No conversation history yet.")
+# Function to send query to the backend
+def send_query(query):
+    response = requests.post(API_URL, json={"query": query})
+    if response.status_code == 200:
+        data = response.json()
+        return data.get("response", "No response received.")
+    else:
+        return f"Error: {response.status_code}"
 
-    for message in st.session_state.chat_history:
-        if message.startswith("User:"):
-            with st.chat_message("user"):
-                st.write(message[5:])
-        elif message.startswith("Bot:"):
-            with st.chat_message("assistant"):
-                st.write(message[4:])
+# Streamlit app layout
+st.title("Whizz")
 
-    if "options" in current_state:
-        for option, next_state in current_state["options"].items():
-            if st.button(option):
-                st.session_state.chat_history.append(f"User: {option}")  # Add to history ONLY HERE
-                try:
-                    if "input" in conversation_flow[next_state] and conversation_flow[next_state]["input"]:
-                        st.session_state.current_state = next_state
-                        st.rerun()
-                    else:
-                        st.session_state.chat_history.append(f"Bot: {conversation_flow[next_state]['message']}")
-                        st.session_state.current_state = next_state
-                        st.rerun()
-                except KeyError:
-                        st.session_state.current_state = "leaf_node"
-                        st.rerun()
-    elif "input" in current_state and current_state["input"]:
-        st.session_state.user_input = st.text_input("Enter your query:", value=st.session_state.user_input)
-        if st.button("Submit"):
-            user_query = st.session_state.user_input
-            st.session_state.chat_history.append(f"User: {user_query}")
-            st.session_state.chat_history.append(f"Bot: Thank you for your question.")
-            st.session_state.current_state = "start"
-            st.session_state.user_input = ""
-            st.rerun()
-    elif "leaf" in current_state and current_state["leaf"]:
-        if st.button("Do you have any further queries?"):
-            st.session_state.current_state = "leaf_query"
-            st.rerun()
-        if st.button("Go to Main Menu"):
-            st.session_state.current_state = "start"
-            st.rerun()
-    elif st.session_state.current_state == "leaf_query":
-        st.session_state.user_input = st.text_input("Enter your query:", value=st.session_state.user_input)
+# Display chat history
+display_chat_history()
 
-        if st.button("Submit Query"):
-            user_query = st.session_state.user_input
-            st.session_state.chat_history.append(f"User: {user_query}")
-            st.session_state.chat_history.append(f"Bot: Thank you for your question.")
-            st.session_state.current_state = "start"
-            st.session_state.user_input = ""
-            st.rerun()
+# Main app logic
+if st.session_state.stage == "greeting":
+    st.write("Hello! How may I help you?")
+    if st.button("Start"):
+        st.session_state.stage = "menu"
 
-if __name__ == "__main__":
-    main()
+elif st.session_state.stage == "menu":
+    st.write("Please select an option for further assistance:")
+    options = ["BN", "RN", "Release Notes", "RMA", "Salesforce Ticket Creation", "Feedback"]
+    choice = st.radio("Choose an option:", options)
+
+    if st.button("Proceed"):
+        if choice == "BN":
+            st.session_state.stage = "bn"
+        elif choice == "RN":
+            st.session_state.stage = "rn"
+        elif choice == "Release Notes":
+            st.session_state.stage = "release_notes"
+        elif choice == "RMA":
+            st.session_state.stage = "rma"
+        elif choice == "Salesforce Ticket Creation":
+            st.session_state.stage = "ticket_basics"
+        elif choice == "Feedback":
+            st.session_state.stage = "feedback"
+
+# BN Handling
+if st.session_state.stage == "bn":
+    st.write("Enter your query for BN:")
+    query = st.text_input("Your query:")
+    if st.button("Submit"):
+        if query:
+            # Send query to backend
+            response = send_query(query)
+            # Update chat history
+            st.session_state.chat_history.append((query, response))
+            # Display response
+            st.markdown(f"**Bot:** {response}")
+            # Ask for satisfaction
+            satisfied = st.radio("Are you satisfied with the response?", ["Yes", "No"])
+            if satisfied == "Yes":
+                st.markdown("**Bot:** Thank you!")
+                st.session_state.chat_history.append(("Are you satisfied with the response?", "Thank you!"))
+                st.session_state.stage = "menu"
+            elif satisfied == "No":
+                st.markdown("**Bot:** Creating a Salesforce ticket...")
+                st.session_state.chat_history.append(("Are you satisfied with the response?", "Creating a Salesforce ticket..."))
+                st.markdown("**Bot:** Ticket created!")
+                st.session_state.stage = "menu"
+elif st.session_state.stage == "ticket_basics":
+    st.write("Please fill the below data")
+    
+    with st.form("ticket_form"):
+        subject = st.text_input("Subject")
+        description = st.text_input("Description")
+        priority = st.selectbox("Priority", ["Low", "Medium", "High"])
+        origin = st.selectbox("Origin", ["Web", "Mobile"])
+        account_id = st.text_input("AccountId")
+        # Submit button
+        submitted = st.form_submit_button("Submit")
+
+    if submitted:
+        # Validate if all required fields are filled
+        if not subject or not description or not account_id:
+            st.error("Please fill in all required fields.")
+        else:
+            # Create payload for ticket creation
+            payload = {
+                "Origin": origin,
+                "Status": "New",
+                "Description": description,
+                "Subject": subject,
+                "Priority": priority,
+            }
+
+            # Add form data to chat history as a user message
+            st.session_state.chat_history.append(("User", f"Subject: {subject}"))
+            st.session_state.chat_history.append(("User", f"Description: {description}, Priority: {priority}, Shipping Address: {account_id if account_id else 'N/A'}"))
+
+            # Call the API to create the ticket and then clear the form
+            create_ticket(payload)
+
+            # After submission, reset the stage to avoid displaying the form again
+            st.session_state.stage = "menu"

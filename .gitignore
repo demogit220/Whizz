@@ -3,3 +3,5 @@ embeddings
 data
 .env
 index_store
+demo.py
+__pycache__

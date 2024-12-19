@@ -12,9 +12,40 @@ from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.llms.openai import OpenAI
+from flask import Flask, request, jsonify
+from sales_ticket import auth_token, create_ticket_utility
 
+app = Flask(__name__)
 api_key=os.getenv("OPENAI_API_KEY")
 
+@app.route('/v1/query', methods=['POST'])
+def handle_query():
+    data = request.get_json()
+    if not data or 'query' not in data:
+        return jsonify({'error': 'Invalid request. Please provide a query.'}), 400
+    query = data['query']
+    global query_engine
+    response = query_engine.query(query)
+    return jsonify({'response': response.response})
+
+@app.route("/v1/create_ticket", methods=["POST"])
+def create_ticket():
+    data = request.get_json()
+    # required_fields = ["customer_name", "operator_name", "cust_phone", "cust_email"]
+    # missing_fields = [field for field in required_fields if field not in data]
+    # if missing_fields:
+    #     return jsonify({'error': f"Missing required fields: {', '.join(missing_fields)}"}), 400
+    try:
+        token = auth_token()
+        case_id = create_ticket_utility(token, data)
+
+        return jsonify({
+            "message": "Ticket created successfully",
+            "ticket_id": case_id
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
 
 def load_documents(dir_path, file_path="./data_demo/constitutionofindiaacts.pdf", save_md_file=True, use_pymup=True):
     if use_pymup:
@@ -39,14 +70,8 @@ def load_index(llama_docs):
     index = VectorStoreIndex.from_documents(llama_docs)
     return index
 
-def query_llm(query: str, index: VectorStoreIndex):
-    query_engine = index.as_query_engine()
-    response = query_engine.query(query)
-    return response
-
-if __name__ == "__main__":
+def initalize():
     print("hello from Whizz!")
-    print(api_key)
 
     # system_prompt="""You are a Q&A assistant. Your goal is to answer questions as accurately as possible based on the instructions and context provided."""
     # query_wrapper_prompt=SimpleInputPrompt("<|USER|>{query_str}<|ASSISTANT|>")
@@ -59,9 +84,13 @@ if __name__ == "__main__":
         docs = load_documents(dir_path="data/Tarana KA",use_pymup=False)
         index = load_index(docs)
         save_persistent(index)
-    retriever = VectorIndexRetriever(index,similarity_top_k=4)
-    postprocessor = SimilarityPostprocessor(similarity_cutoff=0.65)
-    query_engine=RetrieverQueryEngine(retriever, node_postprocessors=[postprocessor])
-    response = query_engine.query("How to connect a BN to TCS?")
-    pprint_response(response, show_source=True)
+    global query_engine
+    # retriever = VectorIndexRetriever(index)
+    # postprocessor = SimilarityPostprocessor(similarity_cutoff=0.65)
+    # query_engine=RetrieverQueryEngine(retriever, node_postprocessors=[postprocessor]) 
+    query_engine = index.as_query_engine()   
 
+if __name__ == "__main__":
+    initalize()
+    app.run(debug=True)
+    
