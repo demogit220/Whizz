@@ -58,11 +58,11 @@ if st.session_state.stage == "greeting":
 
 if st.session_state.stage == "menu":
     st.write("Please select an option for further assistance:")
-    options = ["RN", "BN", "Release Notes", "RMA", "Salesforce Ticket Creation", "Feedback"]
-    choice = st.radio("Choose an option:", options)
+    options = ["Query", "Salesforce Ticket Creation"]
+    choice = st.radio("Choose an option:", options, index=None)
 
     if st.button("Proceed"):
-        if choice == "BN":
+        if choice == "Query":
             st.session_state.stage = "bn"
         elif choice == "Salesforce Ticket Creation":
             st.session_state.stage = "ticket_basics"
@@ -71,7 +71,7 @@ if st.session_state.stage == "menu":
 
 # BN Handling
 if st.session_state.stage == "bn":
-    st.write("Enter your query for BN:")
+    st.write("Enter your query :")
     query = st.chat_input("Your query:")
     if query:
         # Send query to backend
@@ -81,19 +81,17 @@ if st.session_state.stage == "bn":
         # Display response
         st.markdown(f"**Bot:** {response}")
         # Ask for satisfaction
-        satisfied = st.radio("Are you satisfied with the response?", ["No", "Yes"])
-        if satisfied:
-            if satisfied == "Yes":
-                st.markdown("**Bot:** Thank you!")
-                st.session_state.chat_history.append(("Are you satisfied with the response?", "Thank you!"))
-                st.session_state.stage = "menu"
-            elif satisfied == "No":
-                st.markdown("I apologize if my previous response wasn't helpful. Please file salesforce ticket")
-                st.session_state.chat_history.append(("Are you satisfied with the response?", "Creating a Salesforce ticket..."))
-                st.markdown("**Bot:** Ticket created!")
-                st.session_state.stage = "menu"
-        if satisfied == "":
-                st.session_state.stage = "menu"
+        satisfied = st.radio("Are you satisfied with the response?", ["No", "Yes"], index=None)
+        
+        if satisfied == "Yes":
+            st.markdown("**Bot:** Thank you!")
+            st.session_state.chat_history.append(("Are you satisfied with the response?", "Thank you!"))
+            st.session_state.stage = "menu"
+        elif satisfied == "No":
+            st.markdown("I apologize if my previous response wasn't helpful. Please file salesforce ticket")
+            st.session_state.chat_history.append(("Are you satisfied with the response?", "Creating a Salesforce ticket..."))
+            st.session_state.stage = "menu"
+        st.session_state.stage = "menu"
 elif st.session_state.stage == "ticket_basics":
     st.write("Please fill the below data")
     

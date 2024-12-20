@@ -83,7 +83,7 @@ def initalize():
     print("hello from Whizz!")
     Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5", cache_folder="embeddings")
     Settings.llm = OpenAI(model="gpt-4o-mini")
-    persistent_dir = "index_store_pymup"
+    persistent_dir = "index_store"
     dir_path = "data/Tarana KA"
 
     if os.path.isdir(persistent_dir):
