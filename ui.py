@@ -36,8 +36,6 @@ def display_chat_history():
             st.markdown(f"**You:** {user_message}")
             st.markdown(f"**Bot:** {bot_response}")
             st.markdown("---")
-    else:
-        st.write("No conversation history yet.")
 # Function to send query to the backend
 def send_query(query):
     response = requests.post(API_URL, json={"query": query})
@@ -56,23 +54,16 @@ display_chat_history()
 # Main app logic
 if st.session_state.stage == "greeting":
     st.write("Hello! How may I help you?")
-    if st.button("Start"):
-        st.session_state.stage = "menu"
+    st.session_state.stage = "menu"
 
-elif st.session_state.stage == "menu":
+if st.session_state.stage == "menu":
     st.write("Please select an option for further assistance:")
-    options = ["BN", "RN", "Release Notes", "RMA", "Salesforce Ticket Creation", "Feedback"]
+    options = ["RN", "BN", "Release Notes", "RMA", "Salesforce Ticket Creation", "Feedback"]
     choice = st.radio("Choose an option:", options)
 
     if st.button("Proceed"):
         if choice == "BN":
             st.session_state.stage = "bn"
-        elif choice == "RN":
-            st.session_state.stage = "rn"
-        elif choice == "Release Notes":
-            st.session_state.stage = "release_notes"
-        elif choice == "RMA":
-            st.session_state.stage = "rma"
         elif choice == "Salesforce Ticket Creation":
             st.session_state.stage = "ticket_basics"
         elif choice == "Feedback":
@@ -81,25 +72,27 @@ elif st.session_state.stage == "menu":
 # BN Handling
 if st.session_state.stage == "bn":
     st.write("Enter your query for BN:")
-    query = st.text_input("Your query:")
-    if st.button("Submit"):
-        if query:
-            # Send query to backend
-            response = send_query(query)
-            # Update chat history
-            st.session_state.chat_history.append((query, response))
-            # Display response
-            st.markdown(f"**Bot:** {response}")
-            # Ask for satisfaction
-            satisfied = st.radio("Are you satisfied with the response?", ["Yes", "No"])
+    query = st.chat_input("Your query:")
+    if query:
+        # Send query to backend
+        response = send_query(query)
+        # Update chat history
+        st.session_state.chat_history.append((query, response))
+        # Display response
+        st.markdown(f"**Bot:** {response}")
+        # Ask for satisfaction
+        satisfied = st.radio("Are you satisfied with the response?", ["No", "Yes"])
+        if satisfied:
             if satisfied == "Yes":
                 st.markdown("**Bot:** Thank you!")
                 st.session_state.chat_history.append(("Are you satisfied with the response?", "Thank you!"))
                 st.session_state.stage = "menu"
             elif satisfied == "No":
-                st.markdown("**Bot:** Creating a Salesforce ticket...")
+                st.markdown("I apologize if my previous response wasn't helpful. Please file salesforce ticket")
                 st.session_state.chat_history.append(("Are you satisfied with the response?", "Creating a Salesforce ticket..."))
                 st.markdown("**Bot:** Ticket created!")
+                st.session_state.stage = "menu"
+        if satisfied == "":
                 st.session_state.stage = "menu"
 elif st.session_state.stage == "ticket_basics":
     st.write("Please fill the below data")
