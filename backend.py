@@ -26,15 +26,14 @@ def handle_query():
     query = data['query']
     global query_engine
     response = query_engine.query(query)
+    # retrieved_documents = [node.node.get_text() for node in response.source_nodes]
+    # context = "\n".join(retrieved_documents)
+    # final_response = f"Context:\n{context}\n\nQuery:\n{query}\n\nAnswer:\n{response.response}"
     return jsonify({'response': response.response})
 
 @app.route("/v1/create_ticket", methods=["POST"])
 def create_ticket():
     data = request.get_json()
-    # required_fields = ["customer_name", "operator_name", "cust_phone", "cust_email"]
-    # missing_fields = [field for field in required_fields if field not in data]
-    # if missing_fields:
-    #     return jsonify({'error': f"Missing required fields: {', '.join(missing_fields)}"}), 400
     try:
         token = auth_token()
         case_id = create_ticket_utility(token, data)
@@ -46,22 +45,32 @@ def create_ticket():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-
-def load_documents(dir_path, file_path="./data_demo/constitutionofindiaacts.pdf", save_md_file=True, use_pymup=True):
-    if use_pymup:
-        if save_md_file:
-            md_text = pymupdf4llm.to_markdown(file_path)
-            pathlib.Path("output.md").write_bytes(md_text.encode())
-        llama_reader = pymupdf4llm.LlamaMarkdownReader()
-        llama_docs = llama_reader.load_data(file_path)
-    else:
-        llama_docs = SimpleDirectoryReader(dir_path).load_data(show_progress=True)
+def load_documents_from_directory_use_pymup(dir_path, save_md=False):
+    llama_docs = []  
+    
+    for file_name in os.listdir(dir_path):
+        file_path = os.path.join(dir_path, file_name)
+        
+        if os.path.isfile(file_path) and file_name.lower().endswith(".pdf"):
+            if save_md:
+            # Save Markdown file with the same name as the original file
+                md_text = pymupdf4llm.to_markdown(file_path)
+                output_md_path = pathlib.Path(f"md_data_pymup/{file_name}.md")
+                output_md_path.write_bytes(md_text.encode())
+            llama_reader = pymupdf4llm.LlamaMarkdownReader()
+            docs = llama_reader.load_data(file_path)
+            llama_docs.extend(docs) 
+    
     return llama_docs
 
-def save_persistent(index: VectorStoreIndex, dir_path="index_store"):
+def load_documents(dir_path):
+    llama_docs = SimpleDirectoryReader(dir_path).load_data(show_progress=True)
+    return llama_docs
+
+def save_persistent(index: VectorStoreIndex, dir_path):
     index.storage_context.persist(dir_path)
 
-def load_from_storage(dir_path="index_store") -> VectorStoreIndex:
+def load_from_storage(dir_path) -> VectorStoreIndex:
     storage_context = StorageContext.from_defaults(persist_dir=dir_path)
     index = load_index_from_storage(storage_context)
     return index
@@ -72,23 +81,23 @@ def load_index(llama_docs):
 
 def initalize():
     print("hello from Whizz!")
-
-    # system_prompt="""You are a Q&A assistant. Your goal is to answer questions as accurately as possible based on the instructions and context provided."""
-    # query_wrapper_prompt=SimpleInputPrompt("<|USER|>{query_str}<|ASSISTANT|>")
     Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5", cache_folder="embeddings")
     Settings.llm = OpenAI(model="gpt-4o-mini")
-    # breakpoint()
-    if os.path.isdir("index_store"):
-        index = load_from_storage()
+    persistent_dir = "index_store_pymup"
+    dir_path = "data/Tarana KA"
+
+    if os.path.isdir(persistent_dir):
+        index = load_from_storage(persistent_dir)
     else:
-        docs = load_documents(dir_path="data/Tarana KA",use_pymup=False)
+        docs = load_documents_from_directory_use_pymup(dir_path)
         index = load_index(docs)
-        save_persistent(index)
+        save_persistent(index, persistent_dir)
+    
     global query_engine
-    # retriever = VectorIndexRetriever(index)
-    # postprocessor = SimilarityPostprocessor(similarity_cutoff=0.65)
-    # query_engine=RetrieverQueryEngine(retriever, node_postprocessors=[postprocessor]) 
-    query_engine = index.as_query_engine()   
+    # query_engine = index.as_query_engine()   
+    retriever = VectorIndexRetriever(index)
+    postprocessor = SimilarityPostprocessor(similarity_cutoff=0.70)
+    query_engine = RetrieverQueryEngine(retriever=retriever, node_postprocessors=[postprocessor])
 
 if __name__ == "__main__":
     initalize()
